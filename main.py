@@ -222,7 +222,7 @@ def form_ion(key, d_ion: dict):
         value = d_ion["magnetic_moment"]
     else:
         value = 1.
-    d_ion["magnetic_moment"] = expander.number_input(r"Magnetic moment (mu_B)", 0., 10., value=value, step=0.1, key=key)
+    d_ion["magnetic_moment"] = expander.number_input(r"Magnetic moment (mu_B)", 0., 10., value=value, step=0.1, key=key+"_MM")
     
     str_h_zee = get_latex_zeeman()
     
@@ -236,8 +236,8 @@ def form_ion(key, d_ion: dict):
     else:
         value_1 = 0.
         value_2 = 0.
-    d_ion["D"] = expander.number_input("D", -3000., 3000., value=value_1, step=1.00, key=key)
-    d_ion["gamma"] = expander.number_input("gamma", -180., 180., value=value_2, step=1.00, key=key) * numpy.pi/180.
+    d_ion["D"] = expander.number_input("D", -3000., 3000., value=value_1, step=1.00, key=key+"_D")
+    d_ion["gamma"] = expander.number_input("gamma", -180., 180., value=value_2, step=1.00, key=key+"_gamma") * numpy.pi/180.
 
     return 
 
