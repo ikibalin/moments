@@ -6,7 +6,8 @@ import matplotlib.animation as animation
 
 import shgo
 
-
+COEFF_MU_B = 927.40100783/1.380649*1e-3 # mu_B/k_B
+COEFF_INV_CM = 0.124 * 11.6 #cm^-1 -> meV -> K
 
 def calc_energy(beta_i, moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B):
     """
@@ -31,7 +32,12 @@ def calc_energy(beta_i, moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B):
     energy_zee = - (
         b_x * numpy.sum(m_i_x, axis=0) +
         b_z * numpy.sum(m_i_z, axis=0))
-    energy = energy_ex + energy_an + energy_zee
+
+    coeff_ex = COEFF_INV_CM * COEFF_MU_B * COEFF_MU_B
+    coeff_an = coeff_ex
+    coeff_zee = COEFF_MU_B * COEFF_MU_B
+    
+    energy = coeff_ex*energy_ex + coeff_an*energy_an + coeff_zee*energy_zee
     return energy
 
 def calc_m_i_x(beta_i, moment_modulus_i):
@@ -141,15 +147,71 @@ def calc_and_plot_arrows(l_d_ion, d_exchange, theta, field):
     # ax.arrow(0,0, 0, 1, color="black", head_width=0.1)
     n_i = moment_modulus_i.size
 
-    ax.arrow(0,0, b_x, b_z, color="black", head_width=0.1, label=f"B: ({b_x:.2f}, {b_z:.2f})")
+    ls_report = []
+    ls_report.append(f"Minimal energy $E$ is {energy:.3f} K at parameters")
+    ls_report.append(f"|       |         $x$ |         $z$ |")
+    ls_report.append(f"| ----- | ---------:| ---------:|")
+    ls_report.append(f"| $B (T)$ | ${b_x:.3f}$ | ${b_z:.3f}$ |")
+
+    ax.arrow(0,0, b_x, b_z, color="black", head_width=0.1, length_includes_head=True)
     ax.text(kk_text*b_x+delta_text, kk_text*b_z+delta_text, "B")
     for i_ion in range(n_i):
-        ax.arrow(0,0, m_i_x[i_ion], m_i_z[i_ion], head_width=0.1, alpha=0.5, label=f"{i_ion+1:}: ({m_i_x[i_ion]:.1f}, {m_i_z[i_ion]:.1f})")
+        ax.arrow(0,0, m_i_x[i_ion], m_i_z[i_ion], head_width=0.1, length_includes_head=True, alpha=0.5)
+        ls_report.append(f"| $M_{i_ion+1:} (\mu_B)$ | ${m_i_x[i_ion]:.3f}$ | ${m_i_z[i_ion]:.3f}$|")
         ax.text(kk_text*m_i_x[i_ion]+delta_text, kk_text*m_i_z[i_ion]+delta_text, f"{i_ion+1:}")
-    ax.arrow(0, 0, m_x, m_z, head_width=0.1, color="green", alpha=0.5, label=f"m: ({m_x:.2f}, {m_z:.2f})")
+    ax.arrow(0, 0, m_x, m_z, head_width=0.1, color="green", alpha=0.5, length_includes_head=True)
+    ls_report.append(f"| Total $M (\mu_B)$ | ${m_x:.3f}$ | ${m_z:.3f}$| ")
     ax.text(kk_text*m_x+delta_text, kk_text*m_z+delta_text, f"m")
-    ax.legend(loc=0)
-    return fig
+
+    n_points = 90
+    np_b_x, np_b_z, np_m_i_x, np_m_i_z = calc_fields_and_moments(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, theta, field, n_points=n_points)
+    np_m_x = numpy.sum(np_m_i_x, axis=1)
+    np_m_z = numpy.sum(np_m_i_z, axis=1)
+    hh = numpy.max([
+        numpy.abs(np_m_i_x).max(), numpy.abs(np_m_i_z).max(),
+        numpy.abs(np_m_x).max(), numpy.abs(np_m_z).max(),
+        numpy.abs(np_b_x).max(), numpy.abs(np_b_z).max(),
+        ])
+    ax.set_xlim(-hh*1.1, hh*1.1)
+    ax.set_ylim(-hh*1.1, hh*1.1)
+    ax.set_xlabel("$M_x$")
+    ax.set_ylabel("$M_z$")
+    # ax.arrow(0,0, 0, 1, color="black", head_width=0.1)
+    
+    ax.plot(np_b_x, np_b_z, ":k", alpha=0.1)
+    n_i = np_m_i_x.shape[1]
+    for i_ion in range(n_i):
+        ax.plot(np_m_i_x[:,i_ion], np_m_i_z[:,i_ion], "o", alpha=0.1)
+    ax.plot(np_m_x, np_m_z, "og", alpha=0.1)
+
+
+    # ax.legend(loc=0)
+
+    return fig, "\n".join(ls_report)
+
+def calc_fields_and_moments(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, theta, field, n_points: int = 90):
+
+    l_m_i_x, l_m_i_z = [], []
+    l_b_x, l_b_z = [], []
+    np_theta = numpy.linspace(0, 2*numpy.pi, n_points+1)
+    for i_theta, theta in enumerate(np_theta):
+        beta_i, energy = calc_beta12(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, theta, field)
+        m_i_x = calc_m_i_x(beta_i, moment_modulus_i)
+        m_i_z = calc_m_i_z(beta_i, moment_modulus_i)
+        b_x = calc_b_x(theta, field)
+        b_z = calc_b_z(theta, field)
+
+        print(f"Theta {theta*180/numpy.pi:.1f}; energy {energy:.3f}", end="\r")
+        l_m_i_x.append(m_i_x)
+        l_m_i_z.append(m_i_z)
+        l_b_x.append(b_x)
+        l_b_z.append(b_z)
+
+    np_m_i_x = numpy.stack(l_m_i_x, axis=0)
+    np_m_i_z = numpy.stack(l_m_i_z, axis=0)
+    np_b_x = numpy.stack(l_b_x, axis=0)
+    np_b_z = numpy.stack(l_b_z, axis=0)
+    return np_b_x, np_b_z, np_m_i_x, np_m_i_z
 
 def calc_gif_by_dictionary(l_d_ion, d_exchange, field):
     l_moment, l_D, l_gamma = [], [], []
@@ -165,30 +227,8 @@ def calc_gif_by_dictionary(l_d_ion, d_exchange, field):
     for index, d_ex in d_exchange.items():
         dict_J_ij[index] = d_ex["J-scalar"]
 
-
     n_points = 90
-
-    l_m_i_x, l_m_i_z = [], []
-    l_b_x, l_b_z = [], []
-    np_theta = numpy.linspace(0, 2*numpy.pi, n_points+1)
-    for i_theta, theta in enumerate(np_theta):
-        beta_i, energy = calc_beta12(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, theta, field)
-        m_i_x = calc_m_i_x(beta_i, moment_modulus_i)
-        m_i_z = calc_m_i_z(beta_i, moment_modulus_i)
-        b_x = calc_b_x(theta, field)
-        b_z = calc_b_z(theta, field)
-
-        print(f"Theta {theta*180/numpy.pi:.1f}; energy {energy:.3f}", end="\r")
-        # ax.text(1.5,0.9, f"$\phi={phi*180/numpy.pi:5.1f}$\n$B={B:3.1f}$\n$D={D:3.1f}$\n$J={J:3.1f}$\n$b_1 ={beta_1*180/numpy.pi:5.0f}$\n$b_2={beta_2*180/numpy.pi:5.0f}$\n$E={energy:.1f}$")
-        l_m_i_x.append(m_i_x)
-        l_m_i_z.append(m_i_z)
-        l_b_x.append(b_x)
-        l_b_z.append(b_z)
-
-    np_m_i_x = numpy.stack(l_m_i_x, axis=0)
-    np_m_i_z = numpy.stack(l_m_i_z, axis=0)
-    np_b_x = numpy.stack(l_b_x, axis=0)
-    np_b_z = numpy.stack(l_b_z, axis=0)
+    np_b_x, np_b_z, np_m_i_x, np_m_i_z = calc_fields_and_moments(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, theta, field, n_points=n_points)
     fig_1, anim_1 = plot_moments(np_b_x, np_b_z, np_m_i_x, np_m_i_z)
     # fig_1.show()
     return fig_1, anim_1
@@ -222,16 +262,16 @@ str_h_ex = get_latex_exchange()
 
 streamlit.latex("E = " + str_h_zee  + str_h_zfs + str_h_ex)
 
-def form_ion(key, d_ion: dict):
+def form_ion(key, d_ion: dict, i_ion: int):
     d_ion_keys = d_ion.keys()
 
-    expander = streamlit.expander("Parameters of magnetic ion")
+    expander = streamlit.expander(f"Ion {i_ion:}")
     
     if "magnetic_moment" in d_ion_keys:
         value = d_ion["magnetic_moment"]
     else:
         value = 1.
-    d_ion["magnetic_moment"] = expander.number_input(r"M_i (mu_B):", 0., 10., value=value, step=0.1, key=key+"_MM")
+    d_ion["magnetic_moment"] = expander.number_input(f"M_{i_ion:} (mu_B):", 0., 10., value=value, step=0.1, key=key+"_MM")
     
 
     
@@ -241,8 +281,8 @@ def form_ion(key, d_ion: dict):
     else:
         value_1 = 0.
         value_2 = 0.
-    d_ion["D"] = expander.number_input("D_i (cm^-1):", -3000., 3000., value=value_1, step=1.00, key=key+"_D")
-    d_ion["gamma"] = expander.number_input("gamma_i:", -180., 180., value=value_2, step=1.00, key=key+"_gamma") * numpy.pi/180.
+    d_ion["D"] = expander.number_input(f"D_{i_ion:} (cm^-1):", -3000., 3000., value=value_1, step=1.00, key=key+"_D")
+    d_ion["gamma"] = expander.number_input(f"gamma_{i_ion:}:", -180., 180., value=value_2, step=1.00, key=key+"_gamma") * numpy.pi/180.
 
     return 
 
@@ -268,14 +308,14 @@ else:
 
 for i_ion, D_ION in enumerate(l_D_ION):
     # First ion
-    streamlit.markdown(f'## Ion {i_ion+1:}')
-    form_ion(f"ion_{i_ion+1:}", D_ION)
+    # streamlit.markdown(f'## Ion {i_ion+1:}')
+    form_ion(f"ion_{i_ion+1:}", D_ION, i_ion+1)
 
 
 # Exchange term
 if n_ions>1:
-    streamlit.markdown('## Exchange term')
-    expander_exchange = streamlit.expander("Parameters of exchange term")
+    # streamlit.markdown('## Exchange term')
+    expander_exchange = streamlit.expander("Exchange term")
     for i_ion_1 in range(0, n_ions-1):
         for i_ion_2 in range(i_ion_1+1, n_ions):
             t_name = (i_ion_1, i_ion_2)
@@ -292,17 +332,20 @@ if n_ions>1:
             D_EXCHANGE_ij["J-scalar"] = expander_exchange.number_input(f"J-iso between ions {i_ion_1+1:} and {i_ion_2+1:}", -3000., 3000., value=value, step=0.1)
 
 
-
 expander_moments = sb.container()
 ni_field = expander_moments.number_input("Magnetic field (in T)", 0., 20., value=1., step=0.1)
-ni_theta = expander_moments.number_input("Theta", 0., 360., value=0., step=1.) * numpy.pi/180
+# ni_theta = expander_moments.number_input("Theta", 0., 360., value=0., step=1.) * numpy.pi/180
+ni_theta = expander_moments.slider("Theta", min_value=0, max_value=360, value=0, step=1) * numpy.pi/180
+
 
 
 b_moments = expander_moments.button("Interacting ions")
 if b_moments:
-    fig = calc_and_plot_arrows(l_D_ION, D_EXCHANGE, ni_theta, ni_field)
+    fig, s_report = calc_and_plot_arrows(l_D_ION, D_EXCHANGE, ni_theta, ni_field)
     # fig, anim = calc_by_dictionary(l_D_ION, D_EXCHANGE, ni_field)
-    streamlit.pyplot(fig)
+    col1, col2 = streamlit.columns(2)
+    col1.pyplot(fig)
+    col2.markdown(s_report)
 
     # s_report = get_report_energy(hamiltonian, ni_temp)
 
@@ -318,17 +361,6 @@ if b_moments:
 #     anim.save(f_io_2,  writer='imagemagick', fps=30, dpi=300)
 #     sb.download_button("Download calculations", f_io_2, file_name="anim.gif")
 #     # streamlit.pyplot(fig)
-    
-
-# for i_ion in range(n_ions):
-#     b_report_1 = sb.button(f"Isolated ion {i_ion+1:}")
-#     if b_report_1:
-#         D_ION = l_D_ION[i_ion]
-#     
-#         # plt_fig = get_fig_ellipsoids([D_ION, ], {}, ni_temp, ni_f_x, ni_f_y, ni_f_z)
-#         # streamlit.pyplot(plt_fig)
-#         # streamlit.code(s_moment+s_report)
-
 
 
 D_PARAMETERS = {
