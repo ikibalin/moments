@@ -148,7 +148,7 @@ def calc_and_plot_arrows(l_d_ion, d_exchange, theta, field):
     n_i = moment_modulus_i.size
 
     ls_report = []
-    ls_report.append(f"Minimal energy $E$ is {energy:.3f} K at parameters")
+    ls_report.append(f"The energy $E$ is minimal ({energy:.3f} K) at parameters")
     ls_report.append(f"|       |         $x$ |         $z$ |")
     ls_report.append(f"| ----- | ---------:| ---------:|")
     ls_report.append(f"| $B (T)$ | ${b_x:.3f}$ | ${b_z:.3f}$ |")
@@ -249,10 +249,8 @@ def get_latex_exchange():
 
 
 
+streamlit.markdown("Calculate magnetic moments $\mathbf{M}_i$ at given parameters of free energy $E$ defined by Zeeman splitting, anisotropy and exchange terms: ")
 
-streamlit.markdown('# Energy')
-
-streamlit.markdown("The sublattice-moment-related free energy is")
 
 str_h_zee = get_latex_zeeman()
     
@@ -262,10 +260,13 @@ str_h_ex = get_latex_exchange()
 
 streamlit.latex("E = " + str_h_zee  + str_h_zfs + str_h_ex)
 
+
+container_left, container_right = streamlit.columns(2)
+
 def form_ion(key, d_ion: dict, i_ion: int):
     d_ion_keys = d_ion.keys()
 
-    expander = streamlit.expander(f"Ion {i_ion:}")
+    expander = container_right.expander(f"Ion {i_ion:}")
     
     if "magnetic_moment" in d_ion_keys:
         value = d_ion["magnetic_moment"]
@@ -287,23 +288,22 @@ def form_ion(key, d_ion: dict, i_ion: int):
     return 
 
 
-
-sb = streamlit.sidebar
-f_parameters = sb.file_uploader("Load parameters from '.npy'", type="npy")
-if f_parameters is not None:
-    D_PARAMETERS = numpy.load(f_parameters, allow_pickle=True).take(0)
-    l_D_ION = D_PARAMETERS["ions"]
-    n_ions = len(l_D_ION)
-    D_EXCHANGE = D_PARAMETERS["exchange"]
-    n_ions = streamlit.number_input("Number of magnetic ions (N)", 1, 5, value=n_ions, step=1)
-else:
-    n_ions = streamlit.number_input("Number of magnetic ions (N)", 1, 5, value=1, step=1)
-    l_D_ION = [{} for i_ion in range(n_ions)]
-    D_EXCHANGE = {}
-    for i_ion_1 in range(0, n_ions-1):
-        for i_ion_2 in range(i_ion_1+1, n_ions):
-            t_name = (i_ion_1, i_ion_2)
-            D_EXCHANGE[t_name] = {}
+# sb = streamlit.sidebar
+# f_parameters = sb.file_uploader("Load parameters from '.npy'", type="npy")
+# if f_parameters is not None:
+#     D_PARAMETERS = numpy.load(f_parameters, allow_pickle=True).take(0)
+#     l_D_ION = D_PARAMETERS["ions"]
+#     n_ions = len(l_D_ION)
+#     D_EXCHANGE = D_PARAMETERS["exchange"]
+#     n_ions = streamlit.number_input("Number of magnetic ions (N)", 1, 5, value=n_ions, step=1)
+# else:
+n_ions = container_right.number_input("Number of magnetic ions (N)", 1, 5, value=1, step=1)
+l_D_ION = [{} for i_ion in range(n_ions)]
+D_EXCHANGE = {}
+for i_ion_1 in range(0, n_ions-1):
+    for i_ion_2 in range(i_ion_1+1, n_ions):
+        t_name = (i_ion_1, i_ion_2)
+        D_EXCHANGE[t_name] = {}
 
 
 for i_ion, D_ION in enumerate(l_D_ION):
@@ -315,7 +315,7 @@ for i_ion, D_ION in enumerate(l_D_ION):
 # Exchange term
 if n_ions>1:
     # streamlit.markdown('## Exchange term')
-    expander_exchange = streamlit.expander("Exchange term")
+    expander_exchange = container_right.expander("Exchange")
     for i_ion_1 in range(0, n_ions-1):
         for i_ion_2 in range(i_ion_1+1, n_ions):
             t_name = (i_ion_1, i_ion_2)
@@ -332,66 +332,31 @@ if n_ions>1:
             D_EXCHANGE_ij["J-scalar"] = expander_exchange.number_input(f"J-iso between ions {i_ion_1+1:} and {i_ion_2+1:}", -3000., 3000., value=value, step=0.1)
 
 
-expander_moments = sb.container()
-ni_field = expander_moments.number_input("Magnetic field (in T)", 0., 20., value=1., step=0.1)
-# ni_theta = expander_moments.number_input("Theta", 0., 360., value=0., step=1.) * numpy.pi/180
-ni_theta = expander_moments.slider("Theta", min_value=0, max_value=360, value=0, step=1) * numpy.pi/180
+
+# expander_moments = sb.container()
+ni_field = container_left.number_input("Magnetic field (in T)", 0., 20., value=1., step=0.1)
+ni_theta = container_left.slider("Theta", min_value=0, max_value=360, value=0, step=1) * numpy.pi/180
 
 
 
-b_moments = expander_moments.button("Interacting ions")
+b_moments = container_left.button("Calculate moments")
 if b_moments:
-    fig, s_report = calc_and_plot_arrows(l_D_ION, D_EXCHANGE, ni_theta, ni_field)
+    with streamlit.spinner("Please wait..."):
+        fig, s_report = calc_and_plot_arrows(l_D_ION, D_EXCHANGE, ni_theta, ni_field)
     # fig, anim = calc_by_dictionary(l_D_ION, D_EXCHANGE, ni_field)
-    col1, col2 = streamlit.columns(2)
-    col1.pyplot(fig)
-    col2.markdown(s_report)
-
-    # s_report = get_report_energy(hamiltonian, ni_temp)
-
-    # plt_fig = get_fig_ellipsoids(l_D_ION, D_EXCHANGE, ni_temp, ni_f_x, ni_f_y, ni_f_z)
-    # streamlit.pyplot(plt_fig# )
-
-    # streamlit.code("\n".join(ls_report))
-
-# b_gif = expander_moments.button("Calc gif into file")
-# if b_gif:
-#     fig, anim = calc_gif_by_dictionary(l_D_ION, D_EXCHANGE, ni_field)
-#     f_io_2 = io.BytesIO()
-#     anim.save(f_io_2,  writer='imagemagick', fps=30, dpi=300)
-#     sb.download_button("Download calculations", f_io_2, file_name="anim.gif")
-#     # streamlit.pyplot(fig)
-
-
-D_PARAMETERS = {
-    "ions": l_D_ION,
-    "exchange": D_EXCHANGE
-}
-f_io = io.BytesIO()
-numpy.save(f_io, D_PARAMETERS, allow_pickle=True)
-
-sb.download_button("Download parameters into '.npy'", f_io, file_name="parameters.npy")
-
-
-# df = pandas.DataFrame({
-#   'first column': [1, 2, 3, 4],
-#   'second column': [10, 20, 30, 40]
-# })
+    # col1, col2 = container_left.columns(2)
+    container_left.pyplot(fig)
+    container_left.markdown(s_report)
 
 
 
-# streamlit.dataframe(df)
-# b_clicked = streamlit.button("Click it")
-# cb = streamlit.checkbox("I read the conditions")
-# rb = streamlit.radio("What you prefer?", ["Tea", "Coffee", "Nothing"])
-# sb = streamlit.selectbox("Do you want cookies?", ["Yes", "No"])
-# ms = streamlit.multiselect("Buy?", ["Apples", "Banana", "Coffee", "Tea"])
-# ti = streamlit.text_input("First name")
-# ni = streamlit.number_input("Choose your age", 5, 127)
-# te = streamlit.text_area("Text to translate.")
-# di = streamlit.date_input("Date of the meeting")
-# fu = streamlit.file_uploader("Choose input file")
-# ci = streamlit.camera_input("You face")
-# streamlit.metric("Fe2", 76, +3)
+# D_PARAMETERS = {
+#     "ions": l_D_ION,
+#     "exchange": D_EXCHANGE
+# }
+# f_io = io.BytesIO()
+# numpy.save(f_io, D_PARAMETERS, allow_pickle=True)
+# 
+# sb.download_button("Download parameters into '.npy'", f_io, file_name="parameters.npy")
 
-# streamlit.line_chart(df)
+
