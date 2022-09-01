@@ -1,6 +1,5 @@
 import io
 import streamlit
-import pandas
 import numpy
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
