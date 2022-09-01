@@ -195,23 +195,32 @@ def calc_gif_by_dictionary(l_d_ion, d_exchange, field):
 
 
 def get_latex_zeeman():
-    str_h_zee = r"-\mu_B \left( B_x \cdot M_x + B_z \cdot M_z \right) "
+    str_h_zee = r"-\mu_B \sum_i^{N} \left( \mathbf{B} \cdot \mathbf{M}_i\right) "
     return str_h_zee
 
 
 def get_latex_zfs():
-    str_h_zfs = r"- D \cdot \left( \cos \gamma M_z + \sin \gamma M_x \right)^2" #
+    str_h_zfs = r"- \sum_i^{N} D_i M_i^2 \cdot \cos^2 \left( \gamma_i-\beta_i \right) " #
     return str_h_zfs
 
+def get_latex_exchange():
+    str_h_ex = r"+ \sum_{i,j, i \ne j} J_{ij} M_{i} M_{j} \cdot  \cos \left( \beta_i  - \beta_j\right)" #
+    return str_h_ex
 
 
 
 
 streamlit.markdown('# Energy')
 
-streamlit.markdown("The program calculate induced magnetic moment.")
+streamlit.markdown("The sublattice-moment-related free energy is")
 
+str_h_zee = get_latex_zeeman()
+    
+str_h_zfs = get_latex_zfs()
 
+str_h_ex = get_latex_exchange()
+
+streamlit.latex("E = " + str_h_zee  + str_h_zfs + str_h_ex)
 
 def form_ion(key, d_ion: dict):
     d_ion_keys = d_ion.keys()
@@ -222,13 +231,9 @@ def form_ion(key, d_ion: dict):
         value = d_ion["magnetic_moment"]
     else:
         value = 1.
-    d_ion["magnetic_moment"] = expander.number_input(r"Magnetic moment (mu_B)", 0., 10., value=value, step=0.1, key=key+"_MM")
+    d_ion["magnetic_moment"] = expander.number_input(r"M_i (mu_B):", 0., 10., value=value, step=0.1, key=key+"_MM")
     
-    str_h_zee = get_latex_zeeman()
-    
-    str_h_zfs_1 = get_latex_zfs()
-    
-    expander.latex("E_{ion} = " + str_h_zee  + str_h_zfs_1)
+
     
     if "D" in d_ion_keys:
         value_1 = d_ion["D"]
@@ -236,8 +241,8 @@ def form_ion(key, d_ion: dict):
     else:
         value_1 = 0.
         value_2 = 0.
-    d_ion["D"] = expander.number_input("D", -3000., 3000., value=value_1, step=1.00, key=key+"_D")
-    d_ion["gamma"] = expander.number_input("gamma", -180., 180., value=value_2, step=1.00, key=key+"_gamma") * numpy.pi/180.
+    d_ion["D"] = expander.number_input("D_i (cm^-1):", -3000., 3000., value=value_1, step=1.00, key=key+"_D")
+    d_ion["gamma"] = expander.number_input("gamma_i:", -180., 180., value=value_2, step=1.00, key=key+"_gamma") * numpy.pi/180.
 
     return 
 
@@ -250,9 +255,9 @@ if f_parameters is not None:
     l_D_ION = D_PARAMETERS["ions"]
     n_ions = len(l_D_ION)
     D_EXCHANGE = D_PARAMETERS["exchange"]
-    n_ions = streamlit.number_input("Number of magnetic ions", 1, 5, value=n_ions, step=1)
+    n_ions = streamlit.number_input("Number of magnetic ions (N)", 1, 5, value=n_ions, step=1)
 else:
-    n_ions = streamlit.number_input("Number of magnetic ions", 1, 5, value=1, step=1)
+    n_ions = streamlit.number_input("Number of magnetic ions (N)", 1, 5, value=1, step=1)
     l_D_ION = [{} for i_ion in range(n_ions)]
     D_EXCHANGE = {}
     for i_ion_1 in range(0, n_ions-1):
@@ -268,22 +273,23 @@ for i_ion, D_ION in enumerate(l_D_ION):
 
 
 # Exchange term
-streamlit.markdown('## Exchange term')
-expander_exchange = streamlit.expander("Parameters of exchange term")
-for i_ion_1 in range(0, n_ions-1):
-    for i_ion_2 in range(i_ion_1+1, n_ions):
-        t_name = (i_ion_1, i_ion_2)
-        if t_name in D_EXCHANGE.keys():
-            D_EXCHANGE_ij = D_EXCHANGE[t_name]
-        else:
-            D_EXCHANGE_ij = {}
-            D_EXCHANGE[t_name] = D_EXCHANGE_ij
-
-        if "J-scalar" in D_EXCHANGE_ij.keys():
-            value = D_EXCHANGE_ij["J-scalar"]
-        else:
-            value = 0.
-        D_EXCHANGE_ij["J-scalar"] = expander_exchange.number_input(f"J-iso between ions {i_ion_1+1:} and {i_ion_2+1:}", -3000., 3000., value=value, step=0.1)
+if n_ions>1:
+    streamlit.markdown('## Exchange term')
+    expander_exchange = streamlit.expander("Parameters of exchange term")
+    for i_ion_1 in range(0, n_ions-1):
+        for i_ion_2 in range(i_ion_1+1, n_ions):
+            t_name = (i_ion_1, i_ion_2)
+            if t_name in D_EXCHANGE.keys():
+                D_EXCHANGE_ij = D_EXCHANGE[t_name]
+            else:
+                D_EXCHANGE_ij = {}
+                D_EXCHANGE[t_name] = D_EXCHANGE_ij
+    
+            if "J-scalar" in D_EXCHANGE_ij.keys():
+                value = D_EXCHANGE_ij["J-scalar"]
+            else:
+                value = 0.
+            D_EXCHANGE_ij["J-scalar"] = expander_exchange.number_input(f"J-iso between ions {i_ion_1+1:} and {i_ion_2+1:}", -3000., 3000., value=value, step=0.1)
 
 
 
