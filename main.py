@@ -3,8 +3,154 @@ import streamlit
 import numpy
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import base64
 
 import shgo
+
+def render_svg(svg):
+    """Renders the given svg string."""
+    b64 = base64.b64encode(svg.encode('utf-8')).decode("utf-8")
+    # Add some CSS on top
+    center = True
+    css_justify = "center" if center else "left"
+    css = '<p style="text-align:center; display: flex; justify-content: {};">'.format(css_justify)
+    html = r'{}<img src="data:image/svg+xml;base64,{}"/>'.format(
+        css, b64)
+        
+    # html = r'%s' % b64
+    streamlit.write(html, unsafe_allow_html=True)
+    return
+
+
+
+def svg_circle(x,y,rx):
+    ls_out = []
+    return "\n".join(ls_out)
+
+
+def from_coord_to_frame_1d(coord_limit, frame_limit, coord):
+    coord_min = coord_limit[0]
+    delta_coord = coord_limit[1] - coord_min
+
+    frame_min = frame_limit[0]
+    delta_frame = frame_limit[1] - frame_min
+
+    frame = (coord - coord_min) * delta_frame / delta_coord
+    return frame
+
+def from_coord_to_frame_2d(coord_limit, frame_limit, coord):
+    coord_limit_x = (coord_limit[0], coord_limit[2])
+    coord_limit_y = (coord_limit[1], coord_limit[3])
+    frame_limit_x = (frame_limit[0], frame_limit[2])
+    frame_limit_y = (frame_limit[1], frame_limit[3])
+    coord_x = coord[0]
+    coord_y = -1*coord[1]
+    frame_x = from_coord_to_frame_1d(coord_limit_x, frame_limit_x, coord_x)
+    frame_y = from_coord_to_frame_1d(coord_limit_y, frame_limit_y, coord_y)
+    frame = numpy.stack([frame_x, frame_y], axis=0)
+    return frame
+
+
+def svg_head(frame_limit):
+    ls_out = []
+    ls_out.append(f"<svg width=\"15cm\" height=\"15cm\" viewBox=\"{frame_limit[0]:} {frame_limit[1]:} {frame_limit[2]:} {frame_limit[3]:}\"")
+    s_tail = """xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve">
+<title>Example of path</title>
+<defs>
+<marker id='head' orient="auto"
+        markerWidth='3' markerHeight='4'
+        refX='0.1' refY='2'>
+<path d='M0,0 V4 L2,2 Z' fill="black"/>
+</marker>
+
+</defs>
+"""
+    ls_out.append(s_tail)
+    return "\n".join(ls_out)
+
+def svg_tail():
+    s_out = "</svg>"
+    return s_out
+
+def svg_circle(frame_xy, **d_arg):
+    d_arg_keys = d_arg.keys()
+    color = "#000000"
+    if "color" in d_arg_keys:
+        color = d_arg["color"]
+
+
+    ls_circle = []
+    for x, y in zip(frame_xy[0], frame_xy[1]):
+        s_circle = f"<circle id=\"point_b\" r=\"2\" cx=\"{x:.2f}\" cy=\"{y:.2f}\" opacity=\"0.2\" fill=\"none\" stroke=\"{color:}\">\n</circle>\n"
+        ls_circle.append(s_circle)
+    return "\n".join(ls_circle)
+
+
+def svg_animated_line_from_center(frame_xy, frame_center, **d_arg):
+    d_arg_keys = d_arg.keys()
+    color = "#000000"
+    if "color" in d_arg_keys:
+        color = d_arg["color"]
+
+    ls_x, ls_y = [], []
+    for x, y in zip(frame_xy[0], frame_xy[1]):
+        ls_x.append(f"{x:.2f}")
+        ls_y.append(f"{y:.2f}")
+    s_x = ";".join(ls_x)
+    s_y = ";".join(ls_y)
+
+    ls_out = []
+    ls_out.append(f"<line x1=\"{frame_center[0]:.2f}\" y1=\"{frame_center[1]:.2f}\" x2=\"{frame_xy[0,0]:.2f}\" y2=\"{frame_xy[1,0]:.2f}\" stroke=\"{color:}\" marker-end='url(#head)'>")
+    ls_out.append(f"<animate attributeName=\"x2\" values=\"{s_x:}\" dur=\"9s\" repeatCount=\"indefinite\" />")
+    ls_out.append(f"<animate attributeName=\"y2\" values=\"{s_y:}\" dur=\"9s\" repeatCount=\"indefinite\" />")
+    ls_out.append("</line>")
+    return "\n".join(ls_out)
+
+def svg_animated_text(frame_xy, s_text: str, **d_arg):
+    d_arg_keys = d_arg.keys()
+    color = "#000000"
+    if "color" in d_arg_keys:
+        color = d_arg["color"]
+
+    ls_x, ls_y = [], []
+    for x, y in zip(frame_xy[0], frame_xy[1]):
+        ls_x.append(f"{x:.2f}")
+        ls_y.append(f"{y:.2f}")
+    s_x = ";".join(ls_x)
+    s_y = ";".join(ls_y)
+
+    ls_out = []
+    ls_out.append(f"<text x=\"{frame_xy[0,0]:.2f}\" y=\"{frame_xy[1,0]:.2f}\" font-size=\"12\" fill=\"{color:}\">{s_text}")
+    ls_out.append(f"<animate attributeName=\"x\" values=\"{s_x:}\" dur=\"9s\" repeatCount=\"indefinite\" />")
+    ls_out.append(f"<animate attributeName=\"y\" values=\"{s_y:}\" dur=\"9s\" repeatCount=\"indefinite\" />")
+    ls_out.append("</text>")
+
+    return "\n".join(ls_out)
+
+def animated_block(frame_limit, coord_limit, coord_b, label_b, **d_arg):
+    # simplified expression for the center
+    frame_center = (0.5 * frame_limit[0]+ 0.5 * frame_limit[2], 0.5 * frame_limit[1]+ 0.5 * frame_limit[3])
+    frame_b = from_coord_to_frame_2d(coord_limit, frame_limit, coord_b)
+    svg_circle_b =  svg_circle(frame_b, **d_arg)
+    svg_line = svg_animated_line_from_center(frame_b, frame_center, **d_arg)
+    svg_text = svg_animated_text(frame_b, label_b, **d_arg)
+    ls_out = [svg_circle_b, svg_line, svg_text]
+    return "\n".join(ls_out)
+
+def coord_limit(*argv):
+    border = 1.1
+    l_xy_max = []
+    for coord_xy in argv:
+        abs_coord_xy = numpy.abs(coord_xy)
+        l_xy_max.append(numpy.max(abs_coord_xy, axis=1))
+    np_xy_max = numpy.stack(l_xy_max, axis=1)
+    xy_max = numpy.max(np_xy_max)*border
+    coord_limit = (-xy_max, -xy_max, xy_max, xy_max)
+    return coord_limit
+
+
+
+
 
 COEFF_MU_B = 927.40100783/1.380649*1e-3 # mu_B/k_B
 COEFF_INV_CM = 0.124 * 11.6 #cm^-1 -> meV -> K
@@ -164,7 +310,7 @@ def calc_and_plot_arrows(l_d_ion, d_exchange, theta, field):
     ax.text(kk_text*m_x+delta_text, kk_text*m_z+delta_text, f"m")
 
     n_points = 90
-    np_b_x, np_b_z, np_m_i_x, np_m_i_z = calc_fields_and_moments(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, theta, field, n_points=n_points)
+    np_b_x, np_b_z, np_m_i_x, np_m_i_z = calc_fields_and_moments(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, field, n_points=n_points)
     np_m_x = numpy.sum(np_m_i_x, axis=1)
     np_m_z = numpy.sum(np_m_i_z, axis=1)
     hh = numpy.max([
@@ -189,7 +335,7 @@ def calc_and_plot_arrows(l_d_ion, d_exchange, theta, field):
 
     return fig, "\n".join(ls_report)
 
-def calc_fields_and_moments(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, theta, field, n_points: int = 90):
+def calc_fields_and_moments(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, field, n_points: int = 90):
 
     l_m_i_x, l_m_i_z = [], []
     l_b_x, l_b_z = [], []
@@ -228,7 +374,7 @@ def calc_gif_by_dictionary(l_d_ion, d_exchange, field):
         dict_J_ij[index] = d_ex["J-scalar"]
 
     n_points = 90
-    np_b_x, np_b_z, np_m_i_x, np_m_i_z = calc_fields_and_moments(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, theta, field, n_points=n_points)
+    np_b_x, np_b_z, np_m_i_x, np_m_i_z = calc_fields_and_moments(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, field, n_points=n_points)
     fig_1, anim_1 = plot_moments(np_b_x, np_b_z, np_m_i_x, np_m_i_z)
     # fig_1.show()
     return fig_1, anim_1
@@ -335,20 +481,59 @@ if n_ions>1:
 
 # expander_moments = sb.container()
 ni_field = container_left.number_input("Magnetic field (in T)", 0., 20., value=1., step=0.1)
-ni_theta = container_left.slider("Theta", min_value=0, max_value=360, value=0, step=1) * numpy.pi/180
+# ni_theta = container_left.slider("Theta", min_value=0, max_value=360, value=0, step=1) * numpy.pi/180
 
 
 
 b_moments = container_left.button("Calculate moments")
 if b_moments:
     with streamlit.spinner("Please wait..."):
-        fig, s_report = calc_and_plot_arrows(l_D_ION, D_EXCHANGE, ni_theta, ni_field)
-    # fig, anim = calc_by_dictionary(l_D_ION, D_EXCHANGE, ni_field)
-    # col1, col2 = container_left.columns(2)
-    container_left.pyplot(fig)
-    container_left.markdown(s_report)
+        l_moment, l_D, l_gamma = [], [], []
+        for d_ion in l_D_ION:
+            l_moment.append(d_ion["magnetic_moment"])
+            l_D.append(d_ion["D"])
+            l_gamma.append(d_ion["gamma"])
+        moment_modulus_i = numpy.array(l_moment, dtype=float)
+        np_d_i = numpy.array(l_D, dtype=float)
+        np_gamma_i = numpy.array(l_gamma, dtype=float)
 
+        dict_J_ij = {}
+        for index, d_ex in D_EXCHANGE.items():
+            dict_J_ij[index] = d_ex["J-scalar"]
+        n_points = 90
+        # fig, s_report = calc_and_plot_arrows(l_D_ION, D_EXCHANGE, ni_theta, ni_field)
+        np_b_x, np_b_z, np_m_i_x, np_m_i_z = calc_fields_and_moments(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, ni_field, n_points=n_points)
+    
+    
+    coord_b = numpy.stack([np_b_x, np_b_z], axis=0)
+    coord_m = numpy.stack([np_m_i_x, np_m_i_z], axis=0)
+    n_m = coord_m.shape[2]
+    coord_m_total = numpy.sum(coord_m, axis=2)
+    l_coord_m = [coord_m[:, :, i] for i in range(n_m)]
+    
+    coord_limit = coord_limit(coord_b, coord_m_total, *l_coord_m)
+    frame_limit = (0, 0, 150, 150)
+    label_b = "B"
+    label_m_total = "m"
+    ls_svg = []
+    ls_svg.append(svg_head(frame_limit))
 
+    svg_block_b = animated_block(frame_limit, coord_limit, coord_b, label_b, color="#ff0000")
+    ls_svg.append(svg_block_b)
+
+    svg_block_m_total = animated_block(frame_limit, coord_limit, coord_m_total, label_m_total, color="#0000ff")
+    ls_svg.append(svg_block_m_total)
+
+    for i_c_m, c_m in enumerate(l_coord_m):
+        label_m = f"m{i_c_m+1:}"
+        svg_block_m_i = animated_block(frame_limit, coord_limit, c_m, label_m, color="#444444")
+        ls_svg.append(svg_block_m_i)
+
+    ls_svg.append(svg_tail())
+
+    render_svg("\n".join(ls_svg))
+
+    
 
 # D_PARAMETERS = {
 #     "ions": l_D_ION,
