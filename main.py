@@ -1,9 +1,10 @@
 import io
 import streamlit
 import numpy
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import base64
+
+# import scipy
+# import scipy.optimize
 
 import shgo
 
@@ -180,7 +181,8 @@ def calc_energy(beta_i, moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B, e_b
 
     energy_barrier = 0.
     if beta_i_previous is not None:
-        energy_barrier = - e_b*numpy.sum(numpy.square(numpy.cos(beta_i_previous) * m_i_z + numpy.sin(beta_i_previous) * m_i_x), axis=0)
+        energy_barrier = - e_b*numpy.sum(m_i_z_sq*numpy.cos(beta_i_previous-beta_i), axis=0)
+        
 
     coeff_ex = COEFF_INV_CM * COEFF_MU_B * COEFF_MU_B
     coeff_an = coeff_ex
@@ -211,8 +213,15 @@ def calc_beta12(moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B, e_b=0, beta
         "bounds": bounds_beta,
         "args": (moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B),}
 
-    beta_i = numpy.zeros((n_beta_i), dtype=float)
-    res = shgo.shgo(lambda x: calc_energy(x, moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B, e_b, beta_i_previous), bounds_beta)
+    if beta_i_previous is None:
+        beta_i = numpy.zeros((n_beta_i), dtype=float)
+    else:
+        beta_i = beta_i_previous
+
+
+    # res = scipy.optimize.minimize(calc_energy, beta_i, args=(moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B, e_b, beta_i_previous), method="Nelder-Mead")
+
+    res = shgo.shgo(lambda x: calc_energy(x, moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B, e_b=e_b, beta_i_previous=beta_i_previous), bounds_beta)
     
     beta_i_opt = res["x"]
     energy = res["fun"]
@@ -237,7 +246,7 @@ def calc_fields_and_moments(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, fie
         b_x = calc_b_x(theta, field)
         b_z = calc_b_z(theta, field)
 
-        print(f"Theta {theta*180/numpy.pi:.1f}; energy {energy:.3f}", end="\r")
+        # print(f"Theta {theta*180/numpy.pi:.1f}; energy {energy:.3f}", end="\r")
         l_m_i_x.append(m_i_x)
         l_m_i_z.append(m_i_z)
         l_b_x.append(b_x)
@@ -265,7 +274,7 @@ def get_latex_exchange():
     return str_h_ex
 
 def get_latex_barrier():
-    str_h_b = r"- E_b \sum_i^{N} M_i\cdot M^0_i \cdot \cos^2 \left( \beta_i-\beta^0_i \right) " #
+    str_h_b = r"- E_b \sum_i^{N} M_i^2 \cdot \cos \left( \beta_i-\beta^0_i \right) " #
     return str_h_b
 
 streamlit.markdown("Calculate magnetic moments $\mathbf{M}_i$ at given parameters of free energy $E$ defined by Zeeman splitting, anisotropy and exchange terms: ")
@@ -359,7 +368,7 @@ if n_ions>1:
 
 # expander_moments = sb.container()
 ni_field = streamlit.number_input("Magnetic field (in T)", 0., 20., value=1., step=0.1)
-e_b = streamlit.number_input("Energy barrier (in cm^-1)", 0., 1., value=0.01, step=0.01)
+e_b = streamlit.number_input("Energy barrier (in cm^-1)", 0., 1., value=0.0, step=0.01)
 
 
 
