@@ -189,7 +189,7 @@ def calc_energy(beta_i, moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B, e_b
     coeff_eb = coeff_ex
     coeff_zee = COEFF_MU_B * COEFF_MU_B
     
-    energy = coeff_ex*energy_ex + coeff_an*energy_an + coeff_zee*energy_zee + coeff_eb*energy_barrier
+    energy = energy_ex + energy_an + energy_zee + energy_barrier
     return energy
 
 def calc_m_i_x(beta_i, moment_modulus_i):
