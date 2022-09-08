@@ -260,6 +260,37 @@ def calc_fields_and_moments(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, fie
 
 
 
+def calc_fields_and_moments_over_b_size(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, theta, field_max, e_b, n_points: int = 90):
+
+    l_m_i_x, l_m_i_z = [], []
+    l_b_x, l_b_z = [], []
+    np_field = numpy.linspace(0, field_max, n_points, endpoint=True)
+    for i_field, field in enumerate(np_field):
+        if (i_field == 0):
+            beta_i, energy = calc_beta12(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, theta, field, e_b, beta_i_previous=None)
+            beta_i_previous = beta_i
+        else:
+            beta_i, energy = calc_beta12(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, theta, field, e_b, beta_i_previous=beta_i_previous)
+            beta_i_previous = beta_i
+        m_i_x = calc_m_i_x(beta_i, moment_modulus_i)
+        m_i_z = calc_m_i_z(beta_i, moment_modulus_i)
+        b_x = calc_b_x(theta, field)
+        b_z = calc_b_z(theta, field)
+
+        # print(f"Theta {theta*180/numpy.pi:.1f}; energy {energy:.3f}", end="\r")
+        l_m_i_x.append(m_i_x)
+        l_m_i_z.append(m_i_z)
+        l_b_x.append(b_x)
+        l_b_z.append(b_z)
+
+    np_m_i_x = numpy.stack(l_m_i_x, axis=0)
+    np_m_i_z = numpy.stack(l_m_i_z, axis=0)
+    np_b_x = numpy.stack(l_b_x, axis=0)
+    np_b_z = numpy.stack(l_b_z, axis=0)
+    return np_b_x, np_b_z, np_m_i_x, np_m_i_z
+
+
+
 def get_latex_zeeman():
     str_h_zee = r"-\mu_B \sum_i^{N} \left( \mathbf{B} \cdot \mathbf{M}_i\right) "
     return str_h_zee
@@ -367,12 +398,13 @@ if n_ions>1:
 
 
 # expander_moments = sb.container()
-ni_field = streamlit.number_input("Magnetic field (in T)", 0., 20., value=1., step=0.1)
+
 e_b = streamlit.number_input("Energy barrier (in cm^-1)", 0., 1., value=0.0, step=0.01)
 
+ni_field = streamlit.number_input("Magnetic field (in T)", 0., 20., value=1., step=0.1)
 
 
-b_moments = streamlit.button("Calculate moments")
+b_moments = streamlit.button("Calculate moments at field rotation")
 if b_moments:
     with streamlit.spinner("Please wait..."):
         l_moment, l_D, l_gamma = [], [], []
@@ -420,7 +452,56 @@ if b_moments:
 
     render_svg("\n".join(ls_svg))
 
+ni_theta = streamlit.number_input("Angle of field", 0., 360., value=0., step=1.) * numpy.pi/180.
+
+b_moments_over_field = streamlit.button("Calculate moments over field")
+if b_moments_over_field:
+    with streamlit.spinner("Please wait..."):
+        l_moment, l_D, l_gamma = [], [], []
+        for d_ion in l_D_ION:
+            l_moment.append(d_ion["magnetic_moment"])
+            l_D.append(d_ion["D"])
+            l_gamma.append(d_ion["gamma"])
+        moment_modulus_i = numpy.array(l_moment, dtype=float)
+        np_d_i = numpy.array(l_D, dtype=float)
+        np_gamma_i = numpy.array(l_gamma, dtype=float)
+
+        dict_J_ij = {}
+        for index, d_ex in D_EXCHANGE.items():
+            dict_J_ij[index] = d_ex["J-scalar"]
+        n_points = 90
+        # fig, s_report = calc_and_plot_arrows(l_D_ION, D_EXCHANGE, ni_theta, ni_field)
+        np_b_x, np_b_z, np_m_i_x, np_m_i_z = calc_fields_and_moments_over_b_size(moment_modulus_i, dict_J_ij, np_gamma_i, np_d_i, ni_theta, ni_field, e_b, n_points=n_points)
     
+    
+    coord_b = numpy.stack([np_b_x, np_b_z], axis=0)
+    coord_m = numpy.stack([np_m_i_x, np_m_i_z], axis=0)
+    n_m = coord_m.shape[2]
+    coord_m_total = numpy.sum(coord_m, axis=2)
+    l_coord_m = [coord_m[:, :, i] for i in range(n_m)]
+    
+    coord_limit = coord_limit(coord_b, coord_m_total, *l_coord_m)
+    frame_limit = (0, 0, 150, 150)
+    label_b = "B"
+    label_m_total = "m"
+    ls_svg = []
+    ls_svg.append(svg_head(frame_limit))
+
+    svg_block_b = animated_block(frame_limit, coord_limit, coord_b, label_b, color="#ff0000")
+    ls_svg.append(svg_block_b)
+
+    svg_block_m_total = animated_block(frame_limit, coord_limit, coord_m_total, label_m_total, color="#0000ff")
+    ls_svg.append(svg_block_m_total)
+
+    for i_c_m, c_m in enumerate(l_coord_m):
+        label_m = f"m{i_c_m+1:}"
+        svg_block_m_i = animated_block(frame_limit, coord_limit, c_m, label_m, color="#444444")
+        ls_svg.append(svg_block_m_i)
+
+    ls_svg.append(svg_tail())
+
+    render_svg("\n".join(ls_svg))
+
 
 # D_PARAMETERS = {
 #     "ions": l_D_ION,
