@@ -503,13 +503,9 @@ if b_moments_over_field:
     render_svg("\n".join(ls_svg))
 
 
-# D_PARAMETERS = {
-#     "ions": l_D_ION,
-#     "exchange": D_EXCHANGE
-# }
-# f_io = io.BytesIO()
-# numpy.save(f_io, D_PARAMETERS, allow_pickle=True)
-# 
-# sb.download_button("Download parameters into '.npy'", f_io, file_name="parameters.npy")
+streamlit.markdown("""
+Please visit [the site][link_streamlit] to estimate the effect of local anisotropy on magnetic ion.
 
+[link_streamlit]: https://ikibalin-single-moment-single-moment-gtvkmp.streamlitapp.com/
+""")
 
