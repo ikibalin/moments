@@ -3,8 +3,8 @@ import streamlit
 import numpy
 import base64
 
-# import scipy
-# import scipy.optimize
+import scipy
+import scipy.optimize
 
 import shgo
 
@@ -222,6 +222,7 @@ def calc_beta12(moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B, e_b=0, beta
     # res = scipy.optimize.minimize(calc_energy, beta_i, args=(moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B, e_b, beta_i_previous), method="Nelder-Mead")
 
     res = shgo.shgo(lambda x: calc_energy(x, moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B, e_b=e_b, beta_i_previous=beta_i_previous), bounds_beta)
+    res = scipy.optimize.basinhopping(lambda x: calc_energy(x, moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B, e_b=e_b, beta_i_previous=beta_i_previous), res["x"])
     
     beta_i_opt = res["x"]
     energy = res["fun"]
