@@ -165,6 +165,7 @@ def calc_energy(beta_i, moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B, e_b
     m_i_x = calc_m_i_x(beta_i, moment_modulus_i)
     m_i_z = calc_m_i_z(beta_i, moment_modulus_i)
     m_i_z_sq = numpy.square(m_i_z)
+    m_i_sq = numpy.square(moment_modulus_i)
 
     energy_ex = 0
     for (index_i, index_j), j_iso in dict_J_ij.items():
@@ -181,7 +182,7 @@ def calc_energy(beta_i, moment_modulus_i, dict_J_ij, gamma_i, D_i, theta, B, e_b
 
     energy_barrier = 0.
     if beta_i_previous is not None:
-        energy_barrier = - e_b*numpy.sum(m_i_z_sq*numpy.cos(beta_i_previous-beta_i), axis=0)
+        energy_barrier = - e_b*numpy.sum(m_i_sq*numpy.cos(beta_i_previous-beta_i), axis=0)
         
 
     coeff_ex = COEFF_INV_CM * COEFF_MU_B * COEFF_MU_B
